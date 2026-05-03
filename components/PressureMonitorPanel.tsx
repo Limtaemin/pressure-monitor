@@ -84,9 +84,9 @@ export default function PressureMonitorPanel({
   }
 
   return (
-    <section className="mt-10">
+    <section className="mt-8 md:mt-10">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold">보압 상세 확인</h2>
+        <h2 className="text-xl font-bold md:text-2xl">보압 상세 확인</h2>
         <p className="mt-1 text-slate-400">현재 측정 세션: {sessionId}</p>
       </div>
 
@@ -98,7 +98,7 @@ export default function PressureMonitorPanel({
             <SensorCard title="Sensor 3" value={current.sensor3} />
           </section>
 
-          <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold">시간 선택</h2>
 
@@ -251,7 +251,7 @@ function ChartWrapper({
   children: React.ReactNode;
 }) {
   return (
-    <section className="relative rounded-2xl border border-slate-800 bg-slate-900 p-5">
+    <section className="relative rounded-2xl border border-slate-800 bg-slate-900 p-4 md:p-5">
       <button
         onClick={onToggle}
         className="absolute right-4 top-4 rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
@@ -519,11 +519,10 @@ function BumperPressureMap({ current }: { current: SensorData }) {
     <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
       <h2 className="mb-4 text-xl font-semibold">범퍼 압력 위치 표시</h2>
 
-      <div className="relative mx-auto h-[390px] w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-800 bg-black">
-        <img
-          src="/bumper.png"
-          alt="car bumper"
-          className="absolute left-1/2 top-[23%] w-[120%] max-w-none -translate-x-1/2 -translate-y-1/2"
+        <div className="relative mx-auto w-full max-w-xl rounded-2xl border border-slate-800 bg-black p-4">        <img
+        src="/bumper.png"
+        alt="car bumper"
+        className="w-full h-auto object-contain"
         />
 
         {sensors.map((sensor) => {

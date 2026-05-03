@@ -216,19 +216,19 @@ export default function DashboardPage() {
   const current = data[index] || data[data.length - 1];
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-6">
+    <main className="min-h-screen bg-slate-950 px-4 py-4 text-white md:p-6">
       <div className="max-w-6xl mx-auto">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold">Pressure Sensor Monitor</h1>
+          <h1 className="text-2xl font-bold md:text-3xl">Pressure Sensor Monitor</h1>
           <p className="text-slate-400 mt-2">
             FlexiForce 3채널 압력 데이터 시각화
           </p>
           <p className="text-slate-500 mt-1">현재 사출기: {machineId}</p>
 
-          <nav className="mt-6 flex gap-2 overflow-x-auto pb-2">
+          <nav className="mt-6 flex gap-2 overflow-x-auto pb-2 whitespace-nowrap">
             <Link
                 href="/"
-                className="rounded-xl bg-slate-800 px-5 py-3 font-semibold hover:bg-slate-700 transition"
+                className="rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold transition hover:bg-slate-700 md:px-5 md:text-base"
             >
                 사출기 선택
             </Link>
