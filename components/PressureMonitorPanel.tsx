@@ -510,10 +510,10 @@ function BumperPressureMap({ current }: { current: SensorData }) {
   }
 
   const sensors = [
-    { name: "Sensor 1", value: current.sensor1, left: "15%", top: "56%" },
-    { name: "Sensor 2", value: current.sensor2, left: "50%", top: "53%" },
-    { name: "Sensor 3", value: current.sensor3, left: "85%", top: "56%" },
-  ];
+    { name: "Sensor 1", value: current.sensor1, left: "24%", top: "58%" },
+    { name: "Sensor 2", value: current.sensor2, left: "50%", top: "57%" },
+    { name: "Sensor 3", value: current.sensor3, left: "76%", top: "58%" },
+    ];
 
   return (
     <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
@@ -547,7 +547,7 @@ function BumperPressureMap({ current }: { current: SensorData }) {
                 {sensor.value}
               </div>
 
-              <div className="mt-2 rounded-full bg-black/60 px-2 py-1 text-xs text-white">
+              <div className="mt-3 rounded-full bg-black/70 px-2 py-1 text-xs text-white">
                 {sensor.name}
               </div>
             </div>
