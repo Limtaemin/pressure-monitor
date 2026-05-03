@@ -38,7 +38,10 @@ type MeasurementSession = {
 
 type ActualPoint = {
   time_ms: number;
-  pressure: number;
+  sensor1: number;
+  sensor2: number;
+  sensor3: number;
+  avg: number;
 };
 
 export default function AnalysisPage() {
@@ -152,18 +155,21 @@ export default function AnalysisPage() {
     return data as MeasurementSession;
   }
 
-  const actualCurve = useMemo<ActualPoint[]>(() => {
-    return sensorData.map((row) => {
-      const s1 = row.sensor1 ?? 0;
-      const s2 = row.sensor2 ?? 0;
-      const s3 = row.sensor3 ?? 0;
+const actualCurve = useMemo<ActualPoint[]>(() => {
+  return sensorData.map((row) => {
+    const s1 = row.sensor1 ?? 0;
+    const s2 = row.sensor2 ?? 0;
+    const s3 = row.sensor3 ?? 0;
 
-      return {
-        time_ms: row.elapsed_ms,
-        pressure: (s1 + s2 + s3) / 3,
-      };
-    });
-  }, [sensorData]);
+    return {
+      time_ms: row.elapsed_ms,
+      sensor1: s1,
+      sensor2: s2,
+      sensor3: s3,
+      avg: (s1 + s2 + s3) / 3,
+    };
+  });
+}, [sensorData]);
 
   const analysisResult = useMemo(() => {
     if (actualCurve.length === 0) {
@@ -177,7 +183,23 @@ export default function AnalysisPage() {
       };
     }
 
-    const pressures = actualCurve.map((point) => point.pressure);
+    const pressures = actualCurve.map((point) => point.avg);
+
+    const sensor1Values = actualCurve.map((point) => point.sensor1);
+    const sensor2Values = actualCurve.map((point) => point.sensor2);
+    const sensor3Values = actualCurve.map((point) => point.sensor3);
+
+    const sensorMax = {
+    sensor1: Math.max(...sensor1Values),
+    sensor2: Math.max(...sensor2Values),
+    sensor3: Math.max(...sensor3Values),
+    };
+
+    const sensorFinal = {
+    sensor1: sensor1Values[sensor1Values.length - 1],
+    sensor2: sensor2Values[sensor2Values.length - 1],
+    sensor3: sensor3Values[sensor3Values.length - 1],
+    };
     const avgPressure =
       pressures.reduce((sum, value) => sum + value, 0) / pressures.length;
     const maxPressure = Math.max(...pressures);
@@ -186,16 +208,40 @@ export default function AnalysisPage() {
 
     const reasons: string[] = [];
 
-    if (maxPressure < 200) {
-      reasons.push("최대 압력이 200 미만입니다.");
+    if (sensorMax.sensor1 < 200) {
+    reasons.push("Sensor 1 최대 압력이 200 미만입니다.");
     }
 
-    if (finalPressure < 150) {
-      reasons.push("최종 압력이 150 미만입니다.");
+    if (sensorMax.sensor2 < 200) {
+    reasons.push("Sensor 2 최대 압력이 200 미만입니다.");
     }
 
-    if (pressureDrop > 120) {
-      reasons.push("최대 압력 대비 최종 압력 낙차가 120을 초과했습니다.");
+    if (sensorMax.sensor3 < 200) {
+    reasons.push("Sensor 3 최대 압력이 200 미만입니다.");
+    }
+
+    if (sensorFinal.sensor1 < 150) {
+    reasons.push("Sensor 1 최종 압력이 150 미만입니다.");
+    }
+
+    if (sensorFinal.sensor2 < 150) {
+    reasons.push("Sensor 2 최종 압력이 150 미만입니다.");
+    }
+
+    if (sensorFinal.sensor3 < 150) {
+    reasons.push("Sensor 3 최종 압력이 150 미만입니다.");
+    }
+
+    if (sensorMax.sensor1 - sensorFinal.sensor1 > 120) {
+    reasons.push("Sensor 1 최대 압력 대비 최종 압력 낙차가 120을 초과했습니다.");
+    }
+
+    if (sensorMax.sensor2 - sensorFinal.sensor2 > 120) {
+    reasons.push("Sensor 2 최대 압력 대비 최종 압력 낙차가 120을 초과했습니다.");
+    }
+
+    if (sensorMax.sensor3 - sensorFinal.sensor3 > 120) {
+    reasons.push("Sensor 3 최대 압력 대비 최종 압력 낙차가 120을 초과했습니다.");
     }
 
     return {
@@ -485,22 +531,36 @@ function PressureSvgChart({
     );
   }
 
-  function makePolyline(points: { time_ms: number; pressure: number }[]) {
-    return points
-      .filter(
+  function makeActualPolyline(sensorKey: "sensor1" | "sensor2" | "sensor3") {
+    return actualCurve
+        .filter(
         (point) =>
-          Number.isFinite(point.time_ms) &&
-          Number.isFinite(point.pressure) &&
-          point.time_ms >= minTime &&
-          point.time_ms <= maxTime
-      )
-      .map((point) => `${xScale(point.time_ms)},${yScale(point.pressure)}`)
-      .join(" ");
-  }
+            Number.isFinite(point.time_ms) &&
+            Number.isFinite(point[sensorKey]) &&
+            point.time_ms >= minTime &&
+            point.time_ms <= maxTime
+        )
+        .map((point) => `${xScale(point.time_ms)},${yScale(point[sensorKey])}`)
+        .join(" ");
+    }
 
-  const actualPolyline = makePolyline(actualCurve);
-  const referencePolyline = makePolyline(referenceCurve);
+    function makeReferencePolyline(points: ReferencePoint[]) {
+    return points
+        .filter(
+        (point) =>
+            Number.isFinite(point.time_ms) &&
+            Number.isFinite(point.pressure) &&
+            point.time_ms >= minTime &&
+            point.time_ms <= maxTime
+        )
+        .map((point) => `${xScale(point.time_ms)},${yScale(point.pressure)}`)
+        .join(" ");
+    }
 
+    const sensor1Polyline = makeActualPolyline("sensor1");
+    const sensor2Polyline = makeActualPolyline("sensor2");
+    const sensor3Polyline = makeActualPolyline("sensor3");
+    const referencePolyline = makeReferencePolyline(referenceCurve);
   const xTicks = [
     0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000,
   ];
@@ -598,15 +658,37 @@ function PressureSvgChart({
           />
         )}
 
-        {actualPolyline && (
-          <polyline
-            points={actualPolyline}
+        {sensor1Polyline && (
+        <polyline
+            points={sensor1Polyline}
             fill="none"
             stroke="#22d3ee"
             strokeWidth="4"
             strokeLinecap="round"
             strokeLinejoin="round"
-          />
+        />
+        )}
+
+        {sensor2Polyline && (
+        <polyline
+            points={sensor2Polyline}
+            fill="none"
+            stroke="#a78bfa"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+        )}
+
+        {sensor3Polyline && (
+        <polyline
+            points={sensor3Polyline}
+            fill="none"
+            stroke="#34d399"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
         )}
 
         <text x={paddingLeft} y="18" fontSize="13" fill="#22d3ee">
@@ -618,17 +700,27 @@ function PressureSvgChart({
         </text>
       </svg>
 
-      <div className="mt-3 flex gap-4 text-sm">
+      <div className="mt-3 flex flex-wrap gap-4 text-sm">
         <div className="flex items-center gap-2">
-          <span className="inline-block h-1 w-8 rounded bg-cyan-300" />
-          <span className="text-slate-300">actual</span>
+            <span className="inline-block h-1 w-8 rounded bg-cyan-300" />
+            <span className="text-slate-300">Sensor 1</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="inline-block h-1 w-8 rounded bg-yellow-300" />
-          <span className="text-slate-300">reference</span>
+            <span className="inline-block h-1 w-8 rounded bg-violet-300" />
+            <span className="text-slate-300">Sensor 2</span>
         </div>
-      </div>
+
+        <div className="flex items-center gap-2">
+            <span className="inline-block h-1 w-8 rounded bg-emerald-300" />
+            <span className="text-slate-300">Sensor 3</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+            <span className="inline-block h-1 w-8 rounded bg-yellow-300" />
+            <span className="text-slate-300">reference</span>
+        </div>
+        </div>
     </div>
   );
 }
