@@ -519,8 +519,7 @@ function BumperPressureMap({ current }: { current: SensorData }) {
     <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
       <h2 className="mb-4 text-xl font-semibold">범퍼 압력 위치 표시</h2>
 
-        <div className="relative mx-auto h-[250px] w-full max-w-xl overflow-hidden rounded-2xl border border-slate-800 bg-black md:h-[390px]">
-        <img
+            <div className="relative mx-auto h-[210px] w-full max-w-xl overflow-hidden rounded-2xl border border-slate-800 bg-black md:h-[330px]">        <img
             src="/bumper.png"
             alt="car bumper"
             className="absolute left-1/2 top-[47%] w-[108%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain"
