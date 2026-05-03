@@ -510,19 +510,19 @@ function BumperPressureMap({ current }: { current: SensorData }) {
   }
 
   const sensors = [
-    { name: "Sensor 1", value: current.sensor1, left: "24%", top: "61%" },
-    { name: "Sensor 2", value: current.sensor2, left: "50%", top: "64%" },
-    { name: "Sensor 3", value: current.sensor3, left: "76%", top: "61%" },
+    { name: "Sensor 1", value: current.sensor1, left: "24%", top: "68%" },
+    { name: "Sensor 2", value: current.sensor2, left: "50%", top: "72%" },
+    { name: "Sensor 3", value: current.sensor3, left: "76%", top: "68%" },
     ];
 
   return (
     <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
       <h2 className="mb-4 text-xl font-semibold">범퍼 압력 위치 표시</h2>
 
-            <div className="relative mx-auto h-[210px] w-full max-w-xl overflow-hidden rounded-2xl border border-slate-800 bg-black md:h-[330px]">        <img
+           <div className="relative mx-auto h-[180px] w-full max-w-xl overflow-hidden rounded-2xl border border-slate-800 bg-black md:h-[300px]">        <img
             src="/bumper.png"
             alt="car bumper"
-            className="absolute left-1/2 top-[47%] w-[108%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain"
+            className="absolute left-1/2 top-[44%] w-[108%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain"
         />
 
         {sensors.map((sensor) => {
