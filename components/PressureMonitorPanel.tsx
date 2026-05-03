@@ -72,7 +72,7 @@ export default function PressureMonitorPanel({
 
     const interval = setInterval(() => {
       fetchData();
-    }, 1000);
+    }, 500);
 
     return () => clearInterval(interval);
   }, [machineId, sessionId]);
@@ -132,11 +132,11 @@ export default function PressureMonitorPanel({
             />
 
             <div className="mt-3 flex justify-between text-sm text-slate-400">
-              <span>0ms</span>
+              <span>0초</span>
               <span>
-                {index + 1} / {data.length}
+              {index + 1} / {data.length}
               </span>
-              <span>{current.elapsed_ms}ms</span>
+              <span>{(current.elapsed_ms / 1000).toFixed(1)}초</span>
             </div>
 
             <p className="mt-4 text-slate-300">
