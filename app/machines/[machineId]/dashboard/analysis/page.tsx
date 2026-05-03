@@ -254,12 +254,12 @@ export default function AnalysisPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white px-6 py-8">
+    <main className="min-h-screen bg-slate-950 px-4 py-4 text-white md:px-6 md:py-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8 flex items-start justify-between gap-4">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm text-cyan-300 mb-2">Machine ID: {machineId}</p>
-            <h1 className="text-3xl font-bold">EO 판정 분석</h1>
+            <h1 className="text-2xl font-bold md:text-3xl">EO 판정 분석</h1>
             <p className="text-slate-400 mt-2">
               실제 측정 곡선과 DB에 저장된 기준 보압 곡선을 비교합니다.
             </p>
@@ -273,7 +273,7 @@ export default function AnalysisPage() {
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() =>
                 router.push(`/machines/${machineId}/dashboard/history`)
@@ -508,13 +508,11 @@ function PressureSvgChart({
   const yTicks = [0, 100, 200, 300, 400, 500, 600, 700];
 
   return (
-    <div className="w-full overflow-x-auto rounded-xl bg-slate-950 p-4">
+    <div className="w-full rounded-xl bg-slate-950 p-2 md:p-4">
       <svg
-        width="100%"
-        height="420"
         viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="none"
-        className="block min-w-[900px]"
+        preserveAspectRatio="xMidYMid meet"
+        className="block h-auto w-full"
       >
         <rect x="0" y="0" width={width} height={height} fill="#020617" />
 

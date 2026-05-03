@@ -36,10 +36,10 @@ const machines = [
 export default function MachineSelectPage() {
 
   return (
-    <main className="min-h-screen bg-gray-950 p-8 text-white">
+    <main className="min-h-screen bg-gray-950 px-4 py-6 md:p-8 text-white">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-10">
-          <h1 className="mb-3 text-4xl font-bold">
+        <header className="mb-8 md:mb-10">
+          <h1 className="mb-3 text-2xl font-bold md:text-4xl">
             사출 성형기 모니터링 시스템
           </h1>
           <p className="text-gray-400">
@@ -54,7 +54,7 @@ export default function MachineSelectPage() {
               href={`/machines/${machine.id}/login`}
               className="group overflow-hidden rounded-2xl border border-gray-800 bg-gray-900 text-left transition hover:-translate-y-1 hover:border-blue-500 hover:bg-gray-800 hover:shadow-2xl"
             >
-              <div className="h-56 w-full overflow-hidden bg-gray-800">
+              <div className="h-40 w-full overflow-hidden bg-gray-800 md:h-56">
                 <img
                   src={machine.image}
                   alt={machine.name}
@@ -62,10 +62,10 @@ export default function MachineSelectPage() {
                 />
               </div>
 
-              <div className="p-6">
+              <div className="p-4 md:p-6">
                 <div className="mb-4 flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-2xl font-semibold">{machine.name}</h2>
+                    <h2 className="text-lg font-semibold md:text-2xl">{machine.name}</h2>
                     <p className="mt-1 text-gray-400">{machine.model}</p>
                   </div>
 

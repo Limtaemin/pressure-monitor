@@ -270,10 +270,12 @@ function ChartWrapper({
 
 function SensorCard({ title, value }: { title: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-      <p className="mb-2 text-slate-400">{title}</p>
-      <p className="text-4xl font-bold">{value}</p>
-      <p className="mt-2 text-sm text-slate-500">raw ADC value</p>
+    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-3 shadow-lg md:p-6">
+      <p className="mb-1 text-xs text-slate-400 md:mb-2 md:text-base">{title}</p>
+      <p className="text-2xl font-bold md:text-4xl">{value}</p>
+      <p className="mt-1 text-[10px] text-slate-500 md:mt-2 md:text-sm">
+        raw ADC
+      </p>
     </div>
   );
 }
@@ -285,7 +287,7 @@ function BarChart({
   current: SensorData;
   large: boolean;
 }) {
-  const maxValue = 1500;
+  const maxValue = 4095;
 
   const bars = [
     { name: "Sensor 1", value: current.sensor1 },
@@ -377,7 +379,7 @@ function LineChart({
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoverIndex(null)}
         className={`w-full rounded-xl border border-slate-800 bg-slate-950 ${
-          large ? "h-[560px]" : "h-80"
+          large ? "h-[360px] md:h-[560px]" : "h-56 md:h-80"
         }`}
       >
         <line
@@ -491,7 +493,7 @@ function LineChart({
 }
 
 function BumperPressureMap({ current }: { current: SensorData }) {
-  const maxValue = 800;
+  const maxValue = 4095;
 
   function getDotStyle(value: number) {
     const ratio = Math.min(value / maxValue, 1);

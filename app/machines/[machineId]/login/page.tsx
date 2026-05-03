@@ -24,9 +24,9 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-950 p-6 text-white">
-      <section className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900 p-8">
-        <h1 className="mb-2 text-3xl font-bold">관리자 로그인</h1>
+    <main className="flex min-h-screen items-center justify-center bg-gray-950 px-4 py-6 text-white md:p-6">
+      <section className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900 p-5 md:p-8">
+        <h1 className="mb-2 text-2xl font-bold md:text-3xl">관리자 로그인</h1>
         <p className="mb-6 text-gray-400">
           선택된 사출기: <span className="text-blue-400">{machineId}</span>
         </p>

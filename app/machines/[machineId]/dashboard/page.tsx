@@ -225,7 +225,7 @@ export default function DashboardPage() {
           </p>
           <p className="text-slate-500 mt-1">현재 사출기: {machineId}</p>
 
-          <nav className="flex gap-3 mt-6">
+          <nav className="mt-6 flex gap-2 overflow-x-auto pb-2">
             <Link
                 href="/"
                 className="rounded-xl bg-slate-800 px-5 py-3 font-semibold hover:bg-slate-700 transition"

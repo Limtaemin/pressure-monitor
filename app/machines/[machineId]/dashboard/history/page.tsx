@@ -53,16 +53,16 @@ export default function HistoryPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#050817] p-6 text-white">
+    <main className="min-h-screen bg-[#050817] px-4 py-4 text-white md:p-6">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold">과거 보압 기록</h1>
+          <h1 className="text-2xl font-bold md:text-3xl">과거 보압 기록</h1>
           <p className="mt-2 text-sm text-slate-400">
             현재 사출기: {machineId}
           </p>
         </div>
 
-        <div className="mb-8 flex gap-3">
+        <div className="mb-8 flex gap-3 overflow-x-auto pb-2 whitespace-nowrap">
           <Link
             href={`/machines/${machineId}/dashboard`}
             className="rounded-xl bg-slate-800 px-5 py-3 font-bold hover:bg-slate-700"
@@ -85,7 +85,7 @@ export default function HistoryPage() {
           </Link>
         </div>
 
-        <section className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
+        <section className="rounded-2xl border border-slate-700 bg-slate-900 p-4 md:p-6">
           <h2 className="mb-5 text-2xl font-bold">측정 세션 기록</h2>
 
           {loading ? (
