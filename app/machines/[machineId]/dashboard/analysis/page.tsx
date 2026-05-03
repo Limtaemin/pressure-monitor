@@ -57,6 +57,9 @@ export default function AnalysisPage() {
   const [referenceCurve, setReferenceCurve] = useState<ReferencePoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [selectedSensor, setSelectedSensor] = useState<
+    "all" | "sensor1" | "sensor2" | "sensor3"
+    >("all");
 
   useEffect(() => {
     if (!machineId) return;
@@ -411,11 +414,38 @@ const actualCurve = useMemo<ActualPoint[]>(() => {
                   X축 고정: 0~40000ms / Y축 고정: 0~700
                 </div>
               </div>
+            
+            <div className="mb-4 flex flex-wrap gap-2">
+            {[
+                { key: "all", label: "전체" },
+                { key: "sensor1", label: "Sensor 1" },
+                { key: "sensor2", label: "Sensor 2" },
+                { key: "sensor3", label: "Sensor 3" },
+            ].map((item) => (
+                <button
+                key={item.key}
+                onClick={() =>
+                    setSelectedSensor(
+                    item.key as "all" | "sensor1" | "sensor2" | "sensor3"
+                    )
+                }
+                className={`rounded-xl px-4 py-2 text-sm font-bold ${
+                    selectedSensor === item.key
+                    ? "bg-cyan-500 text-slate-950"
+                    : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                }`}
+                >
+                {item.label}
+                </button>
+            ))}
+            </div>
 
               <PressureSvgChart
                 actualCurve={actualCurve}
                 referenceCurve={referenceCurve}
-              />
+                selectedSensor={selectedSensor}
+                />
+
               <div className="mt-8">
                 {session && (
                     <PressureMonitorPanel
@@ -496,10 +526,13 @@ const actualCurve = useMemo<ActualPoint[]>(() => {
 function PressureSvgChart({
   actualCurve,
   referenceCurve,
+  selectedSensor,
 }: {
   actualCurve: ActualPoint[];
   referenceCurve: ReferencePoint[];
+  selectedSensor: "all" | "sensor1" | "sensor2" | "sensor3";
 }) {
+
   const width = 1000;
   const height = 420;
 
@@ -514,7 +547,7 @@ function PressureSvgChart({
   const minTime = 0;
   const maxTime = 40000;
   const minPressure = 0;
-  const maxPressure = 700;
+  const maxPressure = 2000;
 
   function xScale(timeMs: number) {
     return (
@@ -565,7 +598,7 @@ function PressureSvgChart({
     0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000,
   ];
 
-  const yTicks = [0, 100, 200, 300, 400, 500, 600, 700];
+  const yTicks = [0, 250, 500, 750, 1000, 1250, 1500, 1750, 2000];
 
   return (
     <div className="w-full rounded-xl bg-slate-950 p-2 md:p-4">
@@ -663,7 +696,8 @@ function PressureSvgChart({
             points={sensor1Polyline}
             fill="none"
             stroke="#22d3ee"
-            strokeWidth="4"
+            strokeWidth={selectedSensor === "sensor1" || selectedSensor === "all" ? "5" : "2"}
+            opacity={selectedSensor === "sensor1" || selectedSensor === "all" ? "1" : "0.25"}
             strokeLinecap="round"
             strokeLinejoin="round"
         />
@@ -674,7 +708,8 @@ function PressureSvgChart({
             points={sensor2Polyline}
             fill="none"
             stroke="#a78bfa"
-            strokeWidth="4"
+            strokeWidth={selectedSensor === "sensor2" || selectedSensor === "all" ? "5" : "2"}
+            opacity={selectedSensor === "sensor2" || selectedSensor === "all" ? "1" : "0.25"}
             strokeLinecap="round"
             strokeLinejoin="round"
         />
@@ -685,7 +720,8 @@ function PressureSvgChart({
             points={sensor3Polyline}
             fill="none"
             stroke="#34d399"
-            strokeWidth="4"
+            strokeWidth={selectedSensor === "sensor3" || selectedSensor === "all" ? "5" : "2"}
+            opacity={selectedSensor === "sensor3" || selectedSensor === "all" ? "1" : "0.25"}
             strokeLinecap="round"
             strokeLinejoin="round"
         />
