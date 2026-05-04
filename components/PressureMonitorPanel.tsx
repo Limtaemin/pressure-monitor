@@ -140,7 +140,11 @@ export default function PressureMonitorPanel({
             </div>
 
             <p className="mt-4 text-slate-300">
-              선택된 시간: {new Date(current.created_at).toLocaleTimeString()}
+            측정 경과 시간: {(current.elapsed_ms / 1000).toFixed(1)}초
+            </p>
+
+            <p className="mt-1 text-sm text-slate-400">
+            DB 저장 시각: {new Date(current.created_at).toLocaleTimeString()}
             </p>
 
             <p className="mt-2 text-sm text-slate-500">
