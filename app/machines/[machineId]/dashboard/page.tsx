@@ -1,12 +1,14 @@
 "use client";
 
-import Link from "next/link";
-import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import DashboardNav from "@/components/DashboardNav";
 import PressureMonitorPanel from "@/components/PressureMonitorPanel";
+import AppButton from "@/components/AppButton";
+import SectionCard from "@/components/SectionCard";
 
-const TEST_MODE = true;
+const TEST_MODE = false;
 
 type SessionId = string | number;
 
@@ -23,7 +25,7 @@ type SensorData = {
 
 export default function DashboardPage() {
   const params = useParams();
-  const machineId = params.machineId as string;
+  const machineId = String(params.machineId);
 
   const [data, setData] = useState<SensorData[]>([]);
   const [index, setIndex] = useState(0);
@@ -41,17 +43,17 @@ export default function DashboardPage() {
       .limit(500);
 
     if (sessionId) {
-      query = query.eq("session_id", String(sessionId));
+      query = query.eq("session_id", sessionId);
     }
 
     const { data, error } = await query;
 
     if (error) {
-      console.error(error);
+      console.error("sensor_data 불러오기 실패:", error);
       return;
     }
 
-    setData(data || []);
+    setData(data ?? []);
 
     if (data && data.length > 0) {
       setIndex(data.length - 1);
@@ -66,15 +68,18 @@ export default function DashboardPage() {
       .single();
 
     if (error) {
-      console.error(error);
+      console.error("recording_control 불러오기 실패:", error);
       return;
     }
 
-    setIsRecording(data?.is_recording ?? false);
-    setCurrentSessionId(data?.session_id ?? null);
+    const recording = data?.is_recording ?? false;
+    const sessionId = data?.session_id ?? null;
 
-    if (data?.session_id) {
-      await fetchData(data.session_id);
+    setIsRecording(recording);
+    setCurrentSessionId(sessionId);
+
+    if (sessionId) {
+      await fetchData(sessionId);
     }
   }
 
@@ -95,18 +100,21 @@ export default function DashboardPage() {
 
     const sessionId = sessionData.id;
 
+    // 이 값이 true로 바뀌는 순간
+    // 1) 압력센서 ESP32가 데이터 저장을 시작하고
+    // 2) 리니어모터 ESP32가 Supabase를 감시하다가 자동으로 공정을 시작합니다.
     const { error } = await supabase
       .from("recording_control")
       .update({
         is_recording: true,
         start_time: new Date().toISOString(),
-        duration_sec: 40,
+        duration_sec: 20,
         session_id: sessionId,
       })
       .eq("id", 1);
 
     if (error) {
-      console.error(error);
+      console.error("recording_control 업데이트 실패:", error);
       return;
     }
 
@@ -117,13 +125,17 @@ export default function DashboardPage() {
   }
 
   async function stopRecording() {
+    // session_id는 지우지 않습니다.
+    // 그래야 측정 정지 후에도 방금 측정한 그래프가 화면에 남습니다.
     const { error: stopError } = await supabase
       .from("recording_control")
-      .update({ is_recording: false })
+      .update({
+        is_recording: false,
+      })
       .eq("id", 1);
 
     if (stopError) {
-      console.error(stopError);
+      console.error("측정 정지 실패:", stopError);
       return;
     }
 
@@ -131,12 +143,17 @@ export default function DashboardPage() {
 
     if (!currentSessionId) return;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("sensor_data")
       .select("sensor1, sensor2, sensor3, elapsed_ms")
       .eq("machine_id", machineId)
       .eq("session_id", currentSessionId)
       .order("elapsed_ms", { ascending: true });
+
+    if (error) {
+      console.error("세션 데이터 불러오기 실패:", error);
+      return;
+    }
 
     if (!data || data.length < 5) return;
 
@@ -144,16 +161,25 @@ export default function DashboardPage() {
       (d) => (Number(d.sensor1) + Number(d.sensor2) + Number(d.sensor3)) / 3
     );
 
-    const avg = pressures.reduce((sum, v) => sum + v, 0) / pressures.length;
+    const avg =
+      pressures.reduce((sum, value) => sum + value, 0) / pressures.length;
+
     const max = Math.max(...pressures);
-    const final = pressures.slice(-5).reduce((s, v) => s + v, 0) / 5;
+
+    const final =
+      pressures.slice(-5).reduce((sum, value) => sum + value, 0) / 5;
+
     const drop = max - final;
 
     let result = "OK";
 
-    if (max < 200) result = "NG";
-    else if (final < 150) result = "NG";
-    else if (drop > 120) result = "NG";
+    if (max < 120) {
+      result = "NG";
+    } else if (final < 50) {
+      result = "NG";
+    } else if (drop > 700) {
+      result = "NG";
+    }
 
     await supabase
       .from("measurement_sessions")
@@ -176,19 +202,27 @@ export default function DashboardPage() {
       return;
     }
 
-    const rows = Array.from({ length: 40 }, (_, i) => {
-      const t = i / 39;
-      const base = 80 + 620 * Math.sin(Math.min(t * Math.PI, Math.PI));
-      const hold = i > 15 ? 560 - (i - 15) * 5 : base;
-      const pressure = Math.max(80, Math.round(i > 15 ? hold : base));
+    const rows = Array.from({ length: 21 }, (_, i) => {
+      const elapsedMs = i * 1000;
+      let pressure = 0;
+
+      if (elapsedMs <= 5000) {
+        pressure = 70 + elapsedMs * 0.08;
+      } else if (elapsedMs <= 14000) {
+        pressure = 470 + Math.sin(elapsedMs / 1400) * 25;
+      } else {
+        pressure = Math.max(180, 470 - (elapsedMs - 14000) * 0.035);
+      }
+
+      const rounded = Math.round(pressure);
 
       return {
         machine_id: machineId,
         session_id: currentSessionId,
-        sensor1: pressure + Math.round(Math.random() * 20 - 10),
-        sensor2: pressure + Math.round(Math.random() * 20 - 10),
-        sensor3: pressure + Math.round(Math.random() * 20 - 10),
-        elapsed_ms: i * 1000,
+        sensor1: rounded + Math.round(Math.random() * 30 - 15),
+        sensor2: rounded + Math.round(Math.random() * 30 - 15),
+        sensor3: rounded + Math.round(Math.random() * 30 - 15),
+        elapsed_ms: elapsedMs,
       };
     });
 
@@ -200,7 +234,7 @@ export default function DashboardPage() {
     }
 
     await fetchData(currentSessionId);
-    alert("테스트 데이터 40개 생성 완료");
+    alert("테스트 데이터 20초 생성 완료");
   }
 
   useEffect(() => {
@@ -216,119 +250,135 @@ export default function DashboardPage() {
   const current = data[index] || data[data.length - 1];
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-4 text-white md:p-6">
-      <div className="max-w-6xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-2xl font-bold md:text-3xl">Pressure Sensor Monitor</h1>
-          <p className="text-slate-400 mt-2">
-            FlexiForce 3채널 압력 데이터 시각화
-          </p>
-          <p className="text-slate-500 mt-1">현재 사출기: {machineId}</p>
+    <main className="min-h-screen bg-[#050817] px-4 py-4 text-white md:px-6 md:py-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-4 flex flex-col gap-2 md:mb-5 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm font-bold text-cyan-300">실시간 측정</p>
+            <h1 className="mt-1 text-2xl font-black md:text-4xl">
+              Pressure Sensor Monitor
+            </h1>
+            <p className="mt-2 text-sm text-slate-400 md:text-base">
+              현재 사출기:{" "}
+              <span className="font-bold text-slate-200">{machineId}</span>
+            </p>
+          </div>
 
-          <nav className="mt-6 flex gap-2 overflow-x-auto pb-2 whitespace-nowrap">
-            <Link
-                href="/"
-                className="rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold transition hover:bg-slate-700 md:px-5 md:text-base"
-            >
-                사출기 선택
-            </Link>
-
-            <Link
-                href={`/machines/${machineId}/dashboard`}
-                className="rounded-xl bg-blue-600 px-5 py-3 font-semibold hover:bg-blue-500 transition"
-            >
-                실시간 측정
-            </Link>
-
-            <Link
-                href={`/machines/${machineId}/dashboard/analysis`}
-                className="rounded-xl bg-gray-800 px-5 py-3 font-semibold hover:bg-gray-700 transition"
-            >
-                EO 판정
-            </Link>
-
-            <Link
-                href={`/machines/${machineId}/dashboard/history`}
-                className="rounded-xl bg-gray-800 px-5 py-3 font-semibold hover:bg-gray-700 transition"
-            >
-                과거 기록
-            </Link>
-            </nav>
-        </header>
-
-        <section className="bg-slate-900 rounded-2xl p-5 border border-slate-800 mb-8">
-          <h2 className="text-xl font-semibold mb-4">측정 제어</h2>
-
-          <div className="flex flex-wrap items-center gap-4">
-            <button
-              onClick={startRecording}
-              className="px-5 py-3 bg-cyan-500 hover:bg-cyan-400 rounded-xl font-bold"
-            >
-              측정 시작
-            </button>
-
-            <button
-              onClick={stopRecording}
-              className="px-5 py-3 bg-red-500 hover:bg-red-400 rounded-xl font-bold"
-            >
-              측정 정지
-            </button>
-
-            {TEST_MODE && (
-              <button
-                onClick={generateTestData}
-                className="px-5 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-bold"
-              >
-                테스트 데이터 생성
-              </button>
-            )}
-
-            <span
-              className={`px-4 py-2 rounded-xl text-sm font-bold ${
-                isRecording
-                  ? "bg-green-500/20 text-green-400"
-                  : "bg-slate-800 text-slate-400"
-              }`}
-            >
-              {isRecording ? "● 측정 중" : "● 대기 중"}
-            </span>
+          <div className="flex flex-wrap gap-2 text-xs md:justify-end">
+            <StatusBadge active={isRecording}>
+              {isRecording ? "측정 중" : "대기 중"}
+            </StatusBadge>
 
             {currentSessionId && (
-              <span className="text-slate-400 text-sm">
-                session: {currentSessionId}
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 font-bold text-blue-200">
+                session {currentSessionId}
               </span>
             )}
 
             {TEST_MODE && (
-              <span className="text-yellow-400 text-sm font-semibold">
+              <span className="rounded-full border border-yellow-400/40 bg-yellow-400/10 px-3 py-2 font-bold text-yellow-300">
                 TEST_MODE ON
               </span>
             )}
           </div>
-        </section>
+        </div>
 
-        {current ? (
-          <section className="bg-slate-900 rounded-2xl p-5 border border-slate-800 mb-8">
-            <h2 className="text-xl font-semibold mb-4">현재 데이터 요약</h2>
-            <p>Sensor 1: {current.sensor1}</p>
-            <p>Sensor 2: {current.sensor2}</p>
-            <p>Sensor 3: {current.sensor3}</p>
-            <p>elapsed_ms: {current.elapsed_ms}</p>
-            <p>session_id: {current.session_id}</p>
-          </section>
-        ) : (
-          <section className="bg-slate-900 rounded-2xl p-8 border border-slate-800 text-slate-400 mb-8">
-            아직 데이터가 없습니다. 측정 시작 후 ESP32 또는 테스트 데이터 생성 버튼으로 데이터를 넣으세요.
-          </section>
-        )}
+        <DashboardNav machineId={machineId} />
 
-        {isRecording && currentSessionId && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[420px_1fr]">
+          <SectionCard
+            title="측정 제어"
+            description="세션 생성, 측정 정지, 테스트 데이터 생성을 이곳에서 처리합니다."
+            compact
+          >
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+              <AppButton onClick={startRecording} variant="primary" size="md">
+                측정 시작
+              </AppButton>
+
+              <AppButton onClick={stopRecording} variant="danger" size="md">
+                측정 정지
+              </AppButton>
+
+              {TEST_MODE && (
+                <AppButton
+                  onClick={generateTestData}
+                  variant="warning"
+                  size="md"
+                >
+                  테스트 데이터
+                </AppButton>
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="현재 데이터 요약"
+            description="가장 최근에 들어온 센서 값입니다."
+            compact
+          >
+            {current ? (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                <SummaryItem label="Sensor 1" value={current.sensor1} />
+                <SummaryItem label="Sensor 2" value={current.sensor2} />
+                <SummaryItem label="Sensor 3" value={current.sensor3} />
+                <SummaryItem
+                  label="Elapsed"
+                  value={`${current.elapsed_ms ?? 0}ms`}
+                />
+                <SummaryItem label="Data Count" value={data.length} />
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">
+                아직 데이터가 없습니다. 측정 시작 후 ESP32 또는 테스트 데이터
+                생성 버튼으로 데이터를 넣으세요.
+              </p>
+            )}
+          </SectionCard>
+        </div>
+
+        {currentSessionId && (
           <PressureMonitorPanel
             machineId={machineId}
-            sessionId={String(currentSessionId)}
+            sessionId={currentSessionId}
           />
         )}
       </div>
     </main>
+  );
+}
+
+function StatusBadge({
+  active,
+  children,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className={`rounded-full px-3 py-2 font-bold ${
+        active
+          ? "bg-cyan-400 text-slate-950"
+          : "border border-slate-700 bg-slate-900 text-slate-300"
+      }`}
+    >
+      ● {children}
+    </span>
+  );
+}
+
+function SummaryItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-3">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 truncate text-lg font-black text-white">{value}</p>
+    </div>
   );
 }

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import AppButton from "@/components/AppButton";
+import SectionCard from "@/components/SectionCard";
 
 type SensorData = {
   id: number;
@@ -14,8 +16,6 @@ type SensorData = {
   created_at: string;
 };
 
-type ExpandedChart = "bar" | "line" | null;
-
 export default function PressureMonitorPanel({
   machineId,
   sessionId,
@@ -26,7 +26,8 @@ export default function PressureMonitorPanel({
   const [data, setData] = useState<SensorData[]>([]);
   const [index, setIndex] = useState(0);
   const [autoFollowLatest, setAutoFollowLatest] = useState(true);
-  const [expandedChart, setExpandedChart] = useState<ExpandedChart>(null);
+  const [isRecordingNow, setIsRecordingNow] = useState(false);
+  const [showRawTable, setShowRawTable] = useState(false);
 
   const autoFollowLatestRef = useRef(true);
 
@@ -51,13 +52,27 @@ export default function PressureMonitorPanel({
 
     if (newData.length > 0) {
       setIndex((prevIndex) => {
-        if (autoFollowLatestRef.current) {
-          return newData.length - 1;
-        }
-
+        if (autoFollowLatestRef.current) return newData.length - 1;
         return Math.min(prevIndex, newData.length - 1);
       });
     }
+
+    const { data: controlData, error: controlError } = await supabase
+      .from("recording_control")
+      .select("is_recording, session_id")
+      .eq("id", 1)
+      .single();
+
+    if (controlError) {
+      console.error("recording_control 불러오기 실패:", controlError.message);
+      setIsRecordingNow(false);
+      return;
+    }
+
+    const sameSession =
+      String(controlData?.session_id ?? "") === String(sessionId ?? "");
+
+    setIsRecordingNow(Boolean(controlData?.is_recording && sameSession));
   }
 
   useEffect(() => {
@@ -65,6 +80,7 @@ export default function PressureMonitorPanel({
     setIndex(0);
     setAutoFollowLatest(true);
     autoFollowLatestRef.current = true;
+    setShowRawTable(false);
   }, [machineId, sessionId]);
 
   useEffect(() => {
@@ -77,253 +93,184 @@ export default function PressureMonitorPanel({
     return () => clearInterval(interval);
   }, [machineId, sessionId]);
 
-  const current = data[index];
+  if (!sessionId) return null;
 
-  if (!sessionId) {
-    return null;
-  }
+  const current = data[index];
+  const latest = data[data.length - 1];
+  const dataStatus = getDataStatus(latest, isRecordingNow);
 
   return (
-    <section className="mt-8 md:mt-10">
-      <div className="mb-6">
-        <h2 className="text-xl font-bold md:text-2xl">보압 상세 확인</h2>
-        <p className="mt-1 text-slate-400">현재 측정 세션: {sessionId}</p>
-      </div>
+    <section className="mt-4 space-y-4 md:mt-5">
+      <CompactStatusBar
+        data={data}
+        latest={latest}
+        dataStatus={dataStatus}
+        sessionId={sessionId}
+      />
 
       {current ? (
         <>
-          <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-            <SensorCard title="Sensor 1" value={current.sensor1} />
-            <SensorCard title="Sensor 2" value={current.sensor2} />
-            <SensorCard title="Sensor 3" value={current.sensor3} />
-          </section>
-
-          <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:p-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold">시간 선택</h2>
-
-              <button
+          <SectionCard
+            title="보압 흐름 그래프"
+            description="센서별 압력이 시간에 따라 어떻게 변했는지 확인합니다."
+            right={
+              <AppButton
                 onClick={() => {
                   autoFollowLatestRef.current = true;
                   setAutoFollowLatest(true);
                   setIndex(Math.max(data.length - 1, 0));
                 }}
-                className={`rounded-lg px-3 py-2 text-sm font-bold ${
-                  autoFollowLatest
-                    ? "bg-cyan-500 text-slate-950"
-                    : "bg-slate-800 text-white hover:bg-slate-700"
-                }`}
+                variant={autoFollowLatest ? "primary" : "secondary"}
+                size="sm"
               >
                 최신 보기
-              </button>
-            </div>
-
-            <input
-              type="range"
-              min="0"
-              max={Math.max(data.length - 1, 0)}
-              value={Math.min(index, Math.max(data.length - 1, 0))}
-              onChange={(e) => {
-                autoFollowLatestRef.current = false;
-                setAutoFollowLatest(false);
-                setIndex(Number(e.target.value));
-              }}
-              className="w-full"
-            />
-
-            <div className="mt-3 flex justify-between text-sm text-slate-400">
-              <span>0초</span>
-              <span>
-              {index + 1} / {data.length}
-              </span>
-              <span>{(current.elapsed_ms / 1000).toFixed(1)}초</span>
-            </div>
-
-            <p className="mt-4 text-slate-300">
-            측정 경과 시간: {(current.elapsed_ms / 1000).toFixed(1)}초
-            </p>
-
-            <p className="mt-1 text-sm text-slate-400">
-            DB 저장 시각: {new Date(current.created_at).toLocaleTimeString()}
-            </p>
-
-            <p className="mt-2 text-sm text-slate-500">
-              상태:{" "}
-              {autoFollowLatest
-                ? "최신 데이터 자동 추적 중"
-                : "선택한 시간 고정 중"}
-            </p>
-          </section>
-
-          <section
-            className={
-              expandedChart === "bar"
-                ? "mb-8 grid grid-cols-1 gap-6"
-                : expandedChart === "line"
-                ? "mb-8 grid grid-cols-1 gap-6"
-                : "mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2"
+              </AppButton>
             }
+            compact
           >
-            {expandedChart !== "line" && (
-              <ChartWrapper
-                title="현재 압력 막대그래프"
-                expanded={expandedChart === "bar"}
-                onToggle={() =>
-                  setExpandedChart(expandedChart === "bar" ? null : "bar")
-                }
-              >
-                <BarChart current={current} large={expandedChart === "bar"} />
-              </ChartWrapper>
-            )}
+            <LineChart data={data} index={index} />
 
-            {expandedChart !== "bar" && (
-              <ChartWrapper
-                title="누적 꺾은선 그래프"
-                expanded={expandedChart === "line"}
-                onToggle={() =>
-                  setExpandedChart(expandedChart === "line" ? null : "line")
-                }
-              >
-                <LineChart
-                  data={data}
-                  index={index}
-                  large={expandedChart === "line"}
-                />
-              </ChartWrapper>
-            )}
-          </section>
+            <div className="mt-4">
+              <input
+                type="range"
+                min="0"
+                max={Math.max(data.length - 1, 0)}
+                value={Math.min(index, Math.max(data.length - 1, 0))}
+                onChange={(e) => {
+                  autoFollowLatestRef.current = false;
+                  setAutoFollowLatest(false);
+                  setIndex(Number(e.target.value));
+                }}
+                className="w-full"
+              />
 
-          <BumperPressureMap current={current} />
-
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <h2 className="mb-4 text-xl font-semibold">전체 데이터</h2>
-
-            <div className="max-h-80 overflow-x-auto overflow-y-auto">
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-slate-700 text-slate-400">
-                    <th className="py-3">번호</th>
-                    <th className="py-3">Elapsed</th>
-                    <th className="py-3">Sensor 1</th>
-                    <th className="py-3">Sensor 2</th>
-                    <th className="py-3">Sensor 3</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((d, i) => (
-                    <tr
-                      key={d.id}
-                      onClick={() => {
-                        autoFollowLatestRef.current = false;
-                        setAutoFollowLatest(false);
-                        setIndex(i);
-                      }}
-                      className={`cursor-pointer border-b border-slate-800 ${
-                        i === index ? "bg-slate-800" : ""
-                      }`}
-                    >
-                      <td className="py-3">{i + 1}</td>
-                      <td className="py-3">{d.elapsed_ms}ms</td>
-                      <td className="py-3">{d.sensor1}</td>
-                      <td className="py-3">{d.sensor2}</td>
-                      <td className="py-3">{d.sensor3}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="mt-2 grid grid-cols-3 text-xs text-slate-400">
+                <span>0초</span>
+                <span className="text-center">
+                  {index + 1} / {data.length}
+                </span>
+                <span className="text-right">
+                  {(current.elapsed_ms / 1000).toFixed(1)}초
+                </span>
+              </div>
             </div>
+          </SectionCard>
+
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-[360px_1fr]">
+            <SectionCard title="현재 센서 압력" compact>
+              <div className="grid grid-cols-3 gap-2">
+                <SensorMiniCard title="S1" value={current.sensor1} />
+                <SensorMiniCard title="S2" value={current.sensor2} />
+                <SensorMiniCard title="S3" value={current.sensor3} />
+              </div>
+
+              <div className="mt-3 text-xs text-slate-400">
+                선택 시간:{" "}
+                <span className="font-bold text-slate-200">
+                  {(current.elapsed_ms / 1000).toFixed(1)}초
+                </span>
+                {" · "}
+                저장 시각:{" "}
+                <span className="font-bold text-slate-200">
+                  {new Date(current.created_at).toLocaleTimeString()}
+                </span>
+              </div>
+            </SectionCard>
+
+            <BumperPressureMap current={current} />
           </section>
+
+          <SectionCard
+            title="원본 데이터"
+            description="디버깅이 필요할 때만 펼쳐서 확인합니다."
+            right={
+              <AppButton
+                onClick={() => setShowRawTable((prev) => !prev)}
+                variant="secondary"
+                size="sm"
+              >
+                {showRawTable ? "접기" : "전체 데이터 보기"}
+              </AppButton>
+            }
+            compact
+          >
+            {showRawTable ? (
+              <RawDataTable
+                data={data}
+                index={index}
+                onSelect={(i) => {
+                  autoFollowLatestRef.current = false;
+                  setAutoFollowLatest(false);
+                  setIndex(i);
+                }}
+              />
+            ) : (
+              <p className="text-sm text-slate-400">
+                현재 {data.length}개의 데이터가 저장되어 있습니다.
+              </p>
+            )}
+          </SectionCard>
         </>
       ) : (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-400">
-          측정 데이터가 들어오면 이곳에 보압 상세 화면이 표시됩니다.
-        </div>
+        <SectionCard compact>
+          <p className="text-sm text-slate-400">
+            측정 데이터가 들어오면 보압 흐름 그래프가 표시됩니다.
+          </p>
+        </SectionCard>
       )}
     </section>
   );
 }
 
-function ChartWrapper({
-  title,
-  expanded,
-  onToggle,
-  children,
+function CompactStatusBar({
+  data,
+  latest,
+  dataStatus,
+  sessionId,
 }: {
-  title: string;
-  expanded: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
+  data: SensorData[];
+  latest?: SensorData;
+  dataStatus: ReturnType<typeof getDataStatus>;
+  sessionId: string | number | null;
 }) {
-  return (
-    <section className="relative rounded-2xl border border-slate-800 bg-slate-900 p-4 md:p-5">
-      <button
-        onClick={onToggle}
-        className="absolute right-4 top-4 rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
-      >
-        {expanded ? "↙ 축소" : "🔍 확대"}
-      </button>
-
-      <h2 className="mb-4 pr-24 text-xl font-semibold">
-        {title} {expanded ? "(확대)" : ""}
-      </h2>
-
-      {children}
-    </section>
-  );
-}
-
-function SensorCard({ title, value }: { title: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-3 shadow-lg md:p-6">
-      <p className="mb-1 text-xs text-slate-400 md:mb-2 md:text-base">{title}</p>
-      <p className="text-2xl font-bold md:text-4xl">{value}</p>
-      <p className="mt-1 text-[10px] text-slate-500 md:mt-2 md:text-sm">
-        raw ADC
-      </p>
-    </div>
-  );
-}
-
-function BarChart({
-  current,
-  large,
-}: {
-  current: SensorData;
-  large: boolean;
-}) {
-  const maxValue = 4095;
-
-  const bars = [
-    { name: "Sensor 1", value: current.sensor1 },
-    { name: "Sensor 2", value: current.sensor2 },
-    { name: "Sensor 3", value: current.sensor3 },
-  ];
+  const statusClass =
+    dataStatus.color === "green"
+      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+      : dataStatus.color === "yellow"
+      ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-300"
+      : dataStatus.color === "blue"
+      ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+      : "border-red-500/30 bg-red-500/10 text-red-300";
 
   return (
-    <div className={large ? "space-y-8" : "space-y-5"}>
-      {bars.map((bar) => {
-        const width = Math.min((bar.value / maxValue) * 100, 100);
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/95 p-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`rounded-full border px-3 py-2 text-xs font-black ${statusClass}`}>
+            {dataStatus.label}
+          </span>
 
-        return (
-          <div key={bar.name}>
-            <div className="mb-2 flex justify-between">
-              <span className="text-slate-300">{bar.name}</span>
-              <span className="font-bold">{bar.value}</span>
-            </div>
+          <span className="rounded-full border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-300">
+            Session {sessionId}
+          </span>
 
-            <div
-              className={`overflow-hidden rounded-full bg-slate-800 ${
-                large ? "h-14" : "h-8"
-              }`}
-            >
-              <div
-                className="h-full rounded-full bg-cyan-400 transition-all duration-300"
-                style={{ width: `${width}%` }}
-              />
-            </div>
-          </div>
-        );
-      })}
+          {latest && (
+            <span className="rounded-full border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-300">
+              측정 구간 {(latest.elapsed_ms / 1000).toFixed(1)}초
+            </span>
+          )}
+        </div>
+
+        <div className="text-xs text-slate-400">
+          {data.length}개 저장
+          {latest && (
+            <>
+              {" · "}마지막 값 S1 {latest.sensor1} / S2 {latest.sensor2} / S3{" "}
+              {latest.sensor3}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -331,16 +278,14 @@ function BarChart({
 function LineChart({
   data,
   index,
-  large,
 }: {
   data: SensorData[];
   index: number;
-  large: boolean;
 }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
-  const width = 800;
-  const height = large ? 460 : 280;
+  const width = 900;
+  const height = 360;
   const padding = 45;
   const maxValue = 1500;
 
@@ -356,11 +301,23 @@ function LineChart({
     return height - padding - (value / maxValue) * (height - padding * 2);
   }
 
-  function makePoints(sensorKey: "sensor1" | "sensor2" | "sensor3") {
-    return selectedData
-      .map((d, i) => `${getX(i)},${getY(d[sensorKey])}`)
-      .join(" ");
-  }
+  function smoothData(values: number[], windowSize = 3) {
+  return values.map((_, i) => {
+    const start = Math.max(0, i - windowSize + 1);
+    const subset = values.slice(start, i + 1);
+    return subset.reduce((sum, v) => sum + v, 0) / subset.length;
+  });
+}
+
+function makePoints(sensorKey: "sensor1" | "sensor2" | "sensor3") {
+const rawValues = selectedData.map((d) => d[sensorKey]);
+
+const smoothed = smoothData(rawValues, 3); // 👈 여기 숫자 조절 가능
+
+return smoothed
+    .map((v, i) => `${getX(i)},${getY(v)}`)
+    .join(" ");
+}
 
   function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -382,9 +339,7 @@ function LineChart({
         viewBox={`0 0 ${width} ${height}`}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoverIndex(null)}
-        className={`w-full rounded-xl border border-slate-800 bg-slate-950 ${
-          large ? "h-[360px] md:h-[560px]" : "h-56 md:h-80"
-        }`}
+        className="h-[280px] w-full rounded-xl border border-slate-800 bg-slate-950 md:h-[420px]"
       >
         <line
           x1={padding}
@@ -443,55 +398,39 @@ function LineChart({
               strokeWidth="1"
               strokeDasharray="4 4"
             />
-
-            <circle
-              cx={hoverX}
-              cy={getY(activeHover.sensor1)}
-              r="5"
-              fill="#22d3ee"
-            />
-            <circle
-              cx={hoverX}
-              cy={getY(activeHover.sensor2)}
-              r="5"
-              fill="#a78bfa"
-            />
-            <circle
-              cx={hoverX}
-              cy={getY(activeHover.sensor3)}
-              r="5"
-              fill="#34d399"
-            />
+            <circle cx={hoverX} cy={getY(activeHover.sensor1)} r="5" fill="#22d3ee" />
+            <circle cx={hoverX} cy={getY(activeHover.sensor2)} r="5" fill="#a78bfa" />
+            <circle cx={hoverX} cy={getY(activeHover.sensor3)} r="5" fill="#34d399" />
           </>
         )}
       </svg>
 
-      {activeHover && (
-        <div className="mt-4 rounded-xl bg-slate-800 p-4 text-sm">
-          <p className="mb-2 text-slate-300">
-            커서 위치: {hoverIndex! + 1}번째 데이터 / {activeHover.elapsed_ms}
-            ms
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <span className="text-cyan-400">
-              ● Sensor 1: {activeHover.sensor1}
-            </span>
-            <span className="text-violet-400">
-              ● Sensor 2: {activeHover.sensor2}
-            </span>
-            <span className="text-emerald-400">
-              ● Sensor 3: {activeHover.sensor3}
-            </span>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-4 flex gap-4 text-sm">
+      <div className="mt-3 flex flex-wrap gap-4 text-xs">
         <span className="text-cyan-400">● Sensor 1</span>
         <span className="text-violet-400">● Sensor 2</span>
         <span className="text-emerald-400">● Sensor 3</span>
-        <span className="text-yellow-400">─ 현재 슬라이더 위치</span>
+        <span className="text-yellow-400">─ 선택 위치</span>
       </div>
+
+      {activeHover && (
+        <div className="mt-3 rounded-xl bg-slate-950 p-3 text-xs text-slate-300">
+          {activeHover.elapsed_ms}ms · S1 {activeHover.sensor1} / S2{" "}
+          {activeHover.sensor2} / S3 {activeHover.sensor3}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SensorMiniCard({ title, value }: { title: string; value: number }) {
+  const level =
+    value < 50 ? "낮음" : value < 200 ? "보통" : value < 500 ? "높음" : "매우 높음";
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+      <p className="text-xs text-slate-500">{title}</p>
+      <p className="mt-1 text-2xl font-black text-white">{value}</p>
+      <p className="mt-1 text-[11px] text-slate-400">{level}</p>
     </div>
   );
 }
@@ -510,23 +449,22 @@ function BumperPressureMap({ current }: { current: SensorData }) {
 
   function getDotSize(value: number) {
     const ratio = Math.min(value / maxValue, 1);
-    return 24 + ratio * 32;
+    return 22 + ratio * 34;
   }
 
   const sensors = [
-    { name: "Sensor 1", value: current.sensor1, left: "24%", top: "68%" },
-    { name: "Sensor 2", value: current.sensor2, left: "50%", top: "72%" },
-    { name: "Sensor 3", value: current.sensor3, left: "76%", top: "68%" },
-    ];
+    { name: "S1", value: current.sensor1, left: "24%", top: "68%" },
+    { name: "S2", value: current.sensor2, left: "50%", top: "72%" },
+    { name: "S3", value: current.sensor3, left: "76%", top: "68%" },
+  ];
 
   return (
-    <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-      <h2 className="mb-4 text-xl font-semibold">범퍼 압력 위치 표시</h2>
-
-           <div className="relative mx-auto h-[180px] w-full max-w-xl overflow-hidden rounded-2xl border border-slate-800 bg-black md:h-[300px]">        <img
-            src="/bumper.png"
-            alt="car bumper"
-            className="absolute left-1/2 top-[44%] w-[108%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain"
+    <SectionCard title="범퍼 압력 위치" compact>
+      <div className="relative mx-auto h-[180px] w-full max-w-xl overflow-hidden rounded-2xl border border-slate-800 bg-black md:h-[260px]">
+        <img
+          src="/bumper.png"
+          alt="car bumper"
+          className="absolute left-1/2 top-[44%] w-[108%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain"
         />
 
         {sensors.map((sensor) => {
@@ -543,15 +481,12 @@ function BumperPressureMap({ current }: { current: SensorData }) {
                 className={`flex items-center justify-center rounded-full border-2 border-white/90 text-xs font-bold text-white shadow-2xl transition-all duration-300 ${getDotStyle(
                   sensor.value
                 )}`}
-                style={{
-                  width: `${size}px`,
-                  height: `${size}px`,
-                }}
+                style={{ width: `${size}px`, height: `${size}px` }}
               >
                 {sensor.value}
               </div>
 
-              <div className="mt-3 rounded-full bg-black/70 px-2 py-1 text-xs text-white">
+              <div className="mt-2 rounded-full bg-black/70 px-2 py-1 text-xs text-white">
                 {sensor.name}
               </div>
             </div>
@@ -559,12 +494,108 @@ function BumperPressureMap({ current }: { current: SensorData }) {
         })}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-300">
+      <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-300">
         <span className="text-blue-400">● 낮음</span>
         <span className="text-green-400">● 보통</span>
         <span className="text-yellow-400">● 높음</span>
         <span className="text-red-400">● 매우 높음</span>
       </div>
-    </section>
+    </SectionCard>
   );
+}
+
+function RawDataTable({
+  data,
+  index,
+  onSelect,
+}: {
+  data: SensorData[];
+  index: number;
+  onSelect: (index: number) => void;
+}) {
+  return (
+    <div className="max-h-64 overflow-x-auto overflow-y-auto md:max-h-80">
+      <table className="w-full border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b border-slate-700 text-slate-400">
+            <th className="py-3 pr-3">번호</th>
+            <th className="py-3 pr-3">시간</th>
+            <th className="py-3 pr-3">S1</th>
+            <th className="py-3 pr-3">S2</th>
+            <th className="py-3 pr-3">S3</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {data.map((d, i) => (
+            <tr
+              key={d.id}
+              onClick={() => onSelect(i)}
+              className={`cursor-pointer border-b border-slate-800 ${
+                i === index ? "bg-slate-800" : ""
+              }`}
+            >
+              <td className="py-3 pr-3">{i + 1}</td>
+              <td className="py-3 pr-3">
+                {(d.elapsed_ms / 1000).toFixed(1)}초
+              </td>
+              <td className="py-3 pr-3">{d.sensor1}</td>
+              <td className="py-3 pr-3">{d.sensor2}</td>
+              <td className="py-3 pr-3">{d.sensor3}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function getDataStatus(latest: SensorData | undefined, isRecordingNow: boolean) {
+  if (!latest) {
+    return {
+      label: isRecordingNow ? "데이터 대기 중" : "측정 종료됨",
+      color: isRecordingNow ? "yellow" : "blue",
+      message: isRecordingNow
+        ? "측정은 켜져 있지만 아직 저장된 센서 데이터가 없습니다."
+        : "현재 세션에 저장된 센서 데이터가 없습니다.",
+      secondsAgo: null,
+    };
+  }
+
+  const lastTime = new Date(latest.created_at).getTime();
+  const secondsAgo = Math.max(0, (Date.now() - lastTime) / 1000);
+
+  if (!isRecordingNow) {
+    return {
+      label: "측정 종료됨",
+      color: "blue",
+      message: "측정이 종료된 세션입니다.",
+      secondsAgo,
+    };
+  }
+
+  if (secondsAgo <= 4) {
+    return {
+      label: "수신 정상",
+      color: "green",
+      message: `${secondsAgo.toFixed(1)}초 전에 마지막 데이터 수신`,
+      secondsAgo,
+    };
+  }
+
+  if (secondsAgo <= 12) {
+    return {
+      label: "수신 지연",
+      color: "yellow",
+      message: `${secondsAgo.toFixed(1)}초 동안 새 데이터가 없습니다.`,
+      secondsAgo,
+    };
+  }
+
+  return {
+    label: "끊김 의심",
+    color: "red",
+    message: `${secondsAgo.toFixed(1)}초 이상 새 데이터가 없습니다.`,
+    secondsAgo,
+  };
 }
